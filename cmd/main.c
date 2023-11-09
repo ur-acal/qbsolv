@@ -62,6 +62,7 @@ int main(int argc, char *argv[]) {
     parameters_t param = default_parameters();
 
     bool use_dwave = false;
+    bool use_brim = false;
 
     extern char *optarg;
     extern int optind, optopt, opterr;
@@ -82,7 +83,7 @@ int main(int argc, char *argv[]) {
     Tlist_ = -1;      // tabu list length  -1 signals go with defaults
     int64_t seed = 17932241798878;
     int errorCount = 0;
-
+    param.seed = seed;
     static struct option longopts[] = {{"help", no_argument, NULL, 'h'},
                                        {"infile", required_argument, NULL, 'i'},
                                        {"outfile", required_argument, NULL, 'o'},
@@ -196,6 +197,7 @@ int main(int argc, char *argv[]) {
                 break;
             case 'r':
                 seed = strtol(optarg, &chx, 10);  // sets the seed value
+                param.seed = seed;
                 break;
             case 'w':
                 WriteMatrix_ = true;
@@ -235,6 +237,10 @@ int main(int argc, char *argv[]) {
     if (use_dwave) {  // either -S not set and DW_INTERNAL__CONNECTION env variable not NULL, or -S set to 0,
         param.sub_size = dw_init();
         param.sub_sampler = &dw_sub_sample;
+    }
+    if (use_brim) {  // either -S not set and DW_INTERNAL__CONNECTION env variable not NULL, or -S set to 0,
+        param.sub_size = param.sub_size;
+        param.sub_sampler = &brim_sub_sample;
     }
     numsolOut_ = 0;
     print_opts(maxNodes_, &param);

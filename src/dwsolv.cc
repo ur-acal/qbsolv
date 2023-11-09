@@ -48,8 +48,8 @@ int sysResult;
 int start_;
 int my_pid_;
 char DWcommand[256];
-FILE *f, *fr, *fs;
-int i, j, k, l;  // working integer set
+static FILE *f, *fr, *fs;
+static int i, j, k, l;  // working integer set
 //
 // common declare complete, start function
 

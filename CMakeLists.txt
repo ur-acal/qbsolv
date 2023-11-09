@@ -30,20 +30,22 @@ if(CMAKE_CXX_COMPILER_ID MATCHES GNU OR CMAKE_CXX_COMPILER_ID MATCHES Clang)
     set(CMAKE_CXX_FLAGS_DEBUG   "-O0 -g3")
     set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 endif()
-
+set(BRIMPATH "/home/matt/Documents/development/brim/LangevinBRIM/build")
+set(BRIMINC "/home/matt/Documents/development/brim/LangevinBRIM/include")
 # location of header files
-include_directories(${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/cmd)
-
+include_directories(${PROJECT_SOURCE_DIR}/src ${PROJECT_SOURCE_DIR}/include ${PROJECT_SOURCE_DIR}/cmd ${BRIMINC})
+link_directories(BEFORE ${BRIMPATH})
 # static library
 add_library(libqbsolv STATIC src/solver.cc src/util.cc src/dwsolv.cc)
 set_target_properties(libqbsolv PROPERTIES PREFIX "")
 
 if(QBSOLV_BUILD_CMD)
-    # compile main executable
-    add_executable(qbsolv cmd/main.c cmd/readqubo.c)
+# compile main executable
+add_executable(qbsolv cmd/main.c cmd/readqubo.c)
+    # Add BRIM library
 
     # link library
-    target_link_libraries(qbsolv libqbsolv)
+    target_link_libraries(qbsolv libqbsolv libbrim)
 endif()
 
 if(QBSOLV_BUILD_TESTS)

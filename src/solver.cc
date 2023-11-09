@@ -17,6 +17,7 @@
 #include "macros.h"
 #include "qbsolv.h"
 #include "util.h"
+#include "brim_solver.hh"
 
 #include <math.h>
 
@@ -217,8 +218,10 @@ double local_search(int8_t *solution, int qubo_size, double **qubo, double *flip
 
     // initial evaluate needed before evaluate_1bit can be used
     energy = evaluate(solution, qubo_size, (const double **)qubo, flip_cost);
+    double temp = energy;
     energy = local_search_1bit(energy, solution, qubo_size, qubo, flip_cost,
                                bit_flips);  // local search to polish the change
+    // printf("%f %f\n", temp, energy);
     return energy;
 }
 
@@ -538,7 +541,7 @@ int reduce_solve_projection(int *Icompress, double **qubo, int qubo_size, int su
         sub_solution[i] = solution[Icompress[i]];
     }
 
-    param->sub_sampler(sub_qubo, subMatrix, sub_solution, param->sub_sampler_data);
+    param->sub_sampler(sub_qubo, subMatrix, sub_solution, param->sub_sampler_data, 0, NULL);
 
     // modification to write out subqubos
     // char subqubofile[sizeof "subqubo10000.qubo"];
@@ -562,15 +565,30 @@ int reduce_solve_projection(int *Icompress, double **qubo, int qubo_size, int su
     return change;
 }
 
-void dw_sub_sample(double **sub_qubo, int subMatrix, int8_t *sub_solution, void *sub_sampler_data) {
+void dw_sub_sample(double** sub_qubo, int subMatrix, int8_t* sub_solution, void* sub_sampler_data, int64_t seed, FILE* infile) {
     dw_solver(sub_qubo, subMatrix, sub_solution);
     int64_t sub_bit_flips = 0;  //  run a local search with higher precision than the Dwave
     double *flip_cost = (double *)malloc(sizeof(double) * subMatrix);
     local_search(sub_solution, subMatrix, sub_qubo, flip_cost, &sub_bit_flips);
     free(flip_cost);
 }
-
-void tabu_sub_sample(double **sub_qubo, int subMatrix, int8_t *sub_solution, void *sub_sampler_data) {
+void brim_sub_sample(double **sub_qubo, int subMatrix, int8_t *sub_solution, void *sub_sampler_data, int64_t seed,
+                     FILE *infile) {
+    double *flip_cost = (double *)malloc(sizeof(double) * subMatrix);
+    double energy = evaluate(sub_solution, subMatrix, (const double **)sub_qubo, flip_cost);
+    double temp = energy;
+    brim_solve(sub_qubo, subMatrix, sub_solution, 5.5e-8);
+    energy = evaluate(sub_solution, subMatrix, (const double **)sub_qubo, flip_cost);
+    printf("%f %f\n", temp, energy);
+    int64_t sub_bit_flips = 0;  //  run a local search with higher precision than the Dwave
+    for (size_t i = 0; i < subMatrix; i++) {
+        printf("%d ", (int)sub_solution[i]);
+    }
+    printf("\n");
+    local_search(sub_solution, subMatrix, sub_qubo, flip_cost, &sub_bit_flips);
+    free(flip_cost);
+}
+void tabu_sub_sample(double** sub_qubo, int subMatrix, int8_t* sub_solution, void* sub_sampler_data, int64_t seed, FILE* infile) {
     int *TabuK;
     int *index;
     double *flip_cost = (double *)malloc(sizeof(double) * subMatrix);
@@ -585,8 +603,11 @@ void tabu_sub_sample(double **sub_qubo, int subMatrix, int8_t *sub_solution, voi
         index[i] = i;
         current_best[i] = sub_solution[i];
     }
+    double energy = evaluate(sub_solution, subMatrix, (const double **)sub_qubo, flip_cost);
+    double temp = energy;
     solv_submatrix(sub_solution, current_best, subMatrix, sub_qubo, flip_cost, &bit_flips, TabuK, index);
-
+    energy = evaluate(sub_solution, subMatrix, (const double **)sub_qubo, flip_cost);
+    printf("%f %f\n", temp, energy);
     free(current_best);
     free(flip_cost);
     free(index);
@@ -598,6 +619,7 @@ parameters_t default_parameters() {
     parameters_t param;
     param.repeats = 50;
     param.sub_sampler = &tabu_sub_sample;
+    param.inpath = NULL;
     param.sub_size = 47;
     param.sub_sampler_data = NULL;
     return param;

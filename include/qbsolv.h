@@ -13,6 +13,7 @@
 #pragma once
 
 #include "stdheaders_shim.h"
+#include "stdio.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -23,14 +24,19 @@ extern "C" {
 // - a 2d double array that is the sub-problem,
 // - the size of the sub problem
 // - a state vector: on input is the current best state, and should be set to the output state
-typedef void (*SubSolver)(double**, int, int8_t*, void*);
+// - random seed
+typedef void (*SubSolver)(double**, int, int8_t*, void*, int64_t, FILE* infile);
 
 // A parameter structure used to pass in optional arguments to the qbsolv: solve method.
 typedef struct parameters_t {
     // The number of iterations without improvement before giving up
     int32_t repeats;
+    // Random seed
+    int64_t seed;
     // Callback function to solve the sub-qubo
     SubSolver sub_sampler;
+    // Input string path for a mock run sampler
+    char* inpath;
     // The maximum size of problem that sub_sampler is willing to accept
     int32_t sub_size;
     // Extra parameter data passed to sub_sampler for callback specific data.
@@ -41,10 +47,13 @@ typedef struct parameters_t {
 parameters_t default_parameters(void);
 
 // Callback for `solve` to use one of the `dw` calling methods
-void dw_sub_sample(double** sub_qubo, int subMatrix, int8_t* sub_solution, void*);
+void dw_sub_sample(double** sub_qubo, int subMatrix, int8_t* sub_solution, void* sub_sampler_data, int64_t seed, FILE* infile);
+
+// Callback for `solve` to use BRIM on subproblems
+void brim_sub_sample(double **sub_qubo, int subMatrix, int8_t *sub_solution, void *sub_sampler_data, int64_t seed, FILE* infile);
 
 // Callback for `solve` to use tabu on subproblems
-void tabu_sub_sample(double** sub_qubo, int subMatrix, int8_t* sub_solution, void*);
+void tabu_sub_sample(double** sub_qubo, int subMatrix, int8_t* sub_solution, void* sub_sampler_data, int64_t seed, FILE* infile);
 
 // Entry into the overall solver from the main program
 void solve(double** qubo, const int qubo_size, int8_t** solution_list, double* energy_list, int* solution_counts,
