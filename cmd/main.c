@@ -52,7 +52,9 @@ struct nodeStr_ *couplers_;
 //
 
 const int defaultRepeats = 50;
-
+const double defaultSD0 = 2.2;
+const double defaultSD1 = 0.6;
+const double defaultTstop = 1.1e-6;
 int main(int argc, char *argv[]) {
     /*
      *  Initialize global variables, set up data structures,
@@ -88,9 +90,9 @@ int main(int argc, char *argv[]) {
     Tlist_ = -1;      // tabu list length  -1 signals go with defaults
     int64_t seed = 17932241798878;
     int errorCount = 0;
-    double sd0 = 2.2;
-    double sd1 = 0.5;
-    double tstop = 1.1e-6;
+    double sd0 = defaultSD0;
+    double sd1 = defaultSD1;
+    double tstop = defaultTstop;
 
     param.seed = seed;
     static struct option longopts[] = {{"help", no_argument, NULL, 'h'},
@@ -431,8 +433,20 @@ void print_help(void) {
            "\t\tIf present, this optional argument triggers printing the \n"
            "\t\tformat of the QUBO file.\n"
            "\t-r seed \n"
-           "\t\tUsed to reset the seed for the random number generation \n",
-           pgmName_, Time_, defaultRepeats);
+           "\t\tUsed to reset the seed for the random number generation \n"
+           "\t-y anneal \n"
+           "\t\tUsed to set BRIM simulation time. Default value: %f\n"
+           "\t-p sd0 \n"
+           "\t\tUsed to set starting BRIM noise standard deviation. Default value: %f\n"
+           "\t-z sd1 \n"
+           "\t\tUsed to set ending BRIM noise standard deviation. Default value: %f\n"
+           "\t-f tracePath\n"
+           "\t\tThe path to the tracefile from a previous BRIM run. Enables the trace subsampler\n"
+           "\t-d dumpPath\n"
+           "\t\tThe path to dump spin values from the BRIM subsampler. Default value: \"spin_dump.txt\"\n"
+           "\t-b\n"
+           "\t\tSelects the BRIM subsampler, dumps spin values to the provided (or default) dump file path\n",
+           pgmName_, Time_, defaultRepeats, defaultTstop, defaultSD0, defaultSD1);
 
     return;
 }
