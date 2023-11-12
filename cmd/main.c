@@ -14,6 +14,7 @@
  limitations under the License.
 */
 
+#include <assert.h>
 #ifdef _WIN32
 	#include "wingetopt.h"
 #else
@@ -63,13 +64,17 @@ int main(int argc, char *argv[]) {
 
     bool use_dwave = false;
     bool use_brim = false;
+    bool use_trace = false;
 
     extern char *optarg;
     extern int optind, optopt, opterr;
 
     char *inFileName = NULL;
     FILE *inFile = NULL;
-
+    char *traceFileName = NULL;
+    FILE *traceFile = NULL;
+    char *dumpFileName = "spin_dump.txt";
+    FILE *dumpFile = NULL;
     strcpy(pgmName_, "qbsolv");
     findMax_ = false;
     Verbose_ = 0;
@@ -83,6 +88,10 @@ int main(int argc, char *argv[]) {
     Tlist_ = -1;      // tabu list length  -1 signals go with defaults
     int64_t seed = 17932241798878;
     int errorCount = 0;
+    double sd0 = 2.2;
+    double sd1 = 0.5;
+    double tstop = 1.1e-6;
+
     param.seed = seed;
     static struct option longopts[] = {{"help", no_argument, NULL, 'h'},
                                        {"infile", required_argument, NULL, 'i'},
@@ -100,6 +109,12 @@ int main(int argc, char *argv[]) {
                                        {"tlist", required_argument, NULL, 'l'},
                                        {"seed", required_argument, NULL, 'r'},
                                        {"Algo", required_argument, NULL, 'a'},
+                                       {"TraceFile", required_argument, NULL, 'f'},
+                                       {"DumpFile", required_argument, NULL, 'd'},
+                                       {"UseBRIM", no_argument, NULL, 'b'},
+                                       {"Anneal", required_argument, NULL, 'y'},
+                                       {"sd0", required_argument, NULL, 'p'},
+                                       {"sd1", required_argument, NULL, 'z'},
                                        {NULL, no_argument, NULL, 0}};
 
     int opt, option_index = 0;
@@ -107,8 +122,8 @@ int main(int argc, char *argv[]) {
     if (dw_established()) {  // user has set up a DW envir
         use_dwave = true;
     }
-
-    while ((opt = getopt_long(argc, argv, "Hhi:o:v:VS:T:l:n:wmo:t:qr:a:", longopts, &option_index)) != -1) {
+    while ((opt = getopt_long(argc, argv, "Hhi:o:v:VS:T:l:n:wmo:t:qr:a:f:d:by:p:z:", longopts, &option_index)) != -1) {
+        printf("%c", opt);
         switch (opt) {
             case 'a':
                 strcpy(algo_, optarg);  // algorithm copied off of command line -a option
@@ -202,6 +217,33 @@ int main(int argc, char *argv[]) {
             case 'w':
                 WriteMatrix_ = true;
                 break;
+            case 'f':
+                use_trace = true;
+                traceFileName = optarg;
+                if ((traceFile = fopen(traceFileName, "r")) == NULL) {
+                    fprintf(stderr,
+                            "\n\t Error - can't find/open file "
+                            "\"%s\"\n\n",
+                            optarg);
+                    exit(9);
+                }
+                break;
+            case 'd':
+                dumpFileName = optarg;
+                
+                break;
+            case 'b':
+                use_brim = true;
+                break;
+            case 'p':
+                sd0 = strtod(optarg, (char **)NULL);
+                break;
+            case 'y':
+                tstop = strtod(optarg, (char **)NULL);
+                break;
+            case 'z':
+                sd1 = strtod(optarg, (char **)NULL);
+                break;
             default: /* '?' or unknown */
                 print_help();
                 exit(0);
@@ -211,7 +253,27 @@ int main(int argc, char *argv[]) {
     // options from command line complete
     //
     srand(seed);
-
+    if (use_brim) {
+        if ((dumpFile = fopen(dumpFileName, "w")) == NULL) {
+            fprintf(stderr,
+                    "\n\t Error - can't find/open file "
+                    "\"%s\"\n\n",
+                    optarg);
+            exit(9);
+        }
+        brim_params* bp = (brim_params*)malloc(sizeof(brim_params));
+        bp->outfile = dumpFile;
+        bp->seed = seed;
+        bp->sd0 = sd0;
+        bp->sd1 = sd1;
+        bp->tstop = tstop;
+        param.sub_sampler_data = bp;
+    }
+    if (use_trace) {
+        trace_params* tp = (trace_params*)malloc(sizeof(trace_params));
+        tp->infile = traceFile;
+        param.sub_sampler_data = tp;
+    }
     if (inFile == NULL) {
         fprintf(stderr,
                 "\n\t%s error -- no input file (-i option) specified"
@@ -241,6 +303,10 @@ int main(int argc, char *argv[]) {
     if (use_brim) {  // either -S not set and DW_INTERNAL__CONNECTION env variable not NULL, or -S set to 0,
         param.sub_size = param.sub_size;
         param.sub_sampler = &brim_sub_sample;
+    }
+    if (use_trace) {
+        param.sub_size = param.sub_size;
+        param.sub_sampler = &trace_subsample;
     }
     numsolOut_ = 0;
     print_opts(maxNodes_, &param);
@@ -276,6 +342,14 @@ int main(int argc, char *argv[]) {
     if (Verbose_ > 3) {
         fprintf(outFile_, "\n\t\"qbsolv  -i %s\" (%d nodes, %d couplers) - end-of-job\n\n", inFileName, nNodes_,
                 nCouplers_);
+    }
+    if (use_brim) {
+        fclose(dumpFile);
+        free(param.sub_sampler_data);
+    }
+    if (use_trace) {
+        fclose(traceFile);
+        free(param.sub_sampler_data);
     }
     exit(0);
 }

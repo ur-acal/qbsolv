@@ -16,15 +16,26 @@
 #include "extern.h"
 #include "macros.h"
 #include "qbsolv.h"
+#include "assert.h"
 #include "util.h"
 #include "brim_solver.hh"
 
 #include <math.h>
+#include <cstdio>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+static int endsearch = 0;
+int fpeek(FILE *stream)
+{
+    int c;
 
+    c = fgetc(stream);
+    ungetc(c, stream);
+
+    return c;
+}
 // This function Simply evaluates the objective function for a given solution.
 //  call this to double check that a solution = energy
 // @param solution a current solution
@@ -37,6 +48,7 @@ extern "C" {
 // const double ** const qubo
 //     neither the pointer nor the data can be changed
 //
+
 double Simple_evaluate(const int8_t *const solution, const uint qubo_size, const double **const qubo) {
     double result = 0.0;
 
@@ -541,7 +553,7 @@ int reduce_solve_projection(int *Icompress, double **qubo, int qubo_size, int su
         sub_solution[i] = solution[Icompress[i]];
     }
 
-    param->sub_sampler(sub_qubo, subMatrix, sub_solution, param->sub_sampler_data, 0, NULL);
+    param->sub_sampler(sub_qubo, subMatrix, sub_solution, param->sub_sampler_data);
 
     // modification to write out subqubos
     // char subqubofile[sizeof "subqubo10000.qubo"];
@@ -565,30 +577,57 @@ int reduce_solve_projection(int *Icompress, double **qubo, int qubo_size, int su
     return change;
 }
 
-void dw_sub_sample(double** sub_qubo, int subMatrix, int8_t* sub_solution, void* sub_sampler_data, int64_t seed, FILE* infile) {
+void dw_sub_sample(double** sub_qubo, int subMatrix, int8_t* sub_solution, void* sub_sampler_data) {
     dw_solver(sub_qubo, subMatrix, sub_solution);
     int64_t sub_bit_flips = 0;  //  run a local search with higher precision than the Dwave
     double *flip_cost = (double *)malloc(sizeof(double) * subMatrix);
     local_search(sub_solution, subMatrix, sub_qubo, flip_cost, &sub_bit_flips);
     free(flip_cost);
 }
-void brim_sub_sample(double **sub_qubo, int subMatrix, int8_t *sub_solution, void *sub_sampler_data, int64_t seed,
-                     FILE *infile) {
+void brim_sub_sample(double **sub_qubo, int subMatrix, int8_t *sub_solution, void *sub_sampler_data) {
     double *flip_cost = (double *)malloc(sizeof(double) * subMatrix);
     double energy = evaluate(sub_solution, subMatrix, (const double **)sub_qubo, flip_cost);
     double temp = energy;
-    brim_solve(sub_qubo, subMatrix, sub_solution, 5.5e-8);
+    brim_params* bp_ptr = (brim_params*)sub_sampler_data;
+    brim_params bp = *bp_ptr;
+
+    brim_solve(sub_qubo, subMatrix, sub_solution, bp.tstop, bp.seed++, bp.sd0, bp.sd1);
+    *bp_ptr = bp;
+    FILE* outfile = bp.outfile;
     energy = evaluate(sub_solution, subMatrix, (const double **)sub_qubo, flip_cost);
-    printf("%f %f\n", temp, energy);
     int64_t sub_bit_flips = 0;  //  run a local search with higher precision than the Dwave
     for (size_t i = 0; i < subMatrix; i++) {
-        printf("%d ", (int)sub_solution[i]);
+        fprintf(outfile, "%d", (int)sub_solution[i]);
     }
-    printf("\n");
+    fprintf(outfile, "\n");
     local_search(sub_solution, subMatrix, sub_qubo, flip_cost, &sub_bit_flips);
     free(flip_cost);
 }
-void tabu_sub_sample(double** sub_qubo, int subMatrix, int8_t* sub_solution, void* sub_sampler_data, int64_t seed, FILE* infile) {
+void trace_subsample(double **sub_qubo, int subMatrix, int8_t *sub_solution, void *sub_sampler_data) {
+    double *flip_cost = (double *)malloc(sizeof(double) * subMatrix);
+    trace_params *trace_ptr = (trace_params *)sub_sampler_data;
+    FILE *infile = trace_ptr->infile;
+    
+    // char buffer[256];
+    char *bufptr = (char *)calloc(512, sizeof(char));
+    size_t numfetched = 0;
+    getline(&bufptr, &numfetched, infile);
+
+    int64_t sub_bit_flips = 0;  //  run a local search with higher precision than the Dwave
+    assert(numfetched >= subMatrix);
+    // printf("%s", bufptr);
+    // printf("%s", bufptr);
+    for (size_t i = 0; i < subMatrix; i++) {
+        sub_solution[i] = (int8_t)(bufptr[i] - '0');
+    }
+    local_search(sub_solution, subMatrix, sub_qubo, flip_cost, &sub_bit_flips);
+    if (feof(infile) || fpeek(infile) == -1) {
+        endsearch = 1;
+        printf("subsolutions exhausted\n");
+    }
+    free(flip_cost);
+}
+void tabu_sub_sample(double** sub_qubo, int subMatrix, int8_t* sub_solution, void* sub_sampler_data) {
     int *TabuK;
     int *index;
     double *flip_cost = (double *)malloc(sizeof(double) * subMatrix);
@@ -603,11 +642,7 @@ void tabu_sub_sample(double** sub_qubo, int subMatrix, int8_t* sub_solution, voi
         index[i] = i;
         current_best[i] = sub_solution[i];
     }
-    double energy = evaluate(sub_solution, subMatrix, (const double **)sub_qubo, flip_cost);
-    double temp = energy;
     solv_submatrix(sub_solution, current_best, subMatrix, sub_qubo, flip_cost, &bit_flips, TabuK, index);
-    energy = evaluate(sub_solution, subMatrix, (const double **)sub_qubo, flip_cost);
-    printf("%f %f\n", temp, energy);
     free(current_best);
     free(flip_cost);
     free(index);
@@ -619,7 +654,6 @@ parameters_t default_parameters() {
     parameters_t param;
     param.repeats = 50;
     param.sub_sampler = &tabu_sub_sample;
-    param.inpath = NULL;
     param.sub_size = 47;
     param.sub_sampler_data = NULL;
     return param;
@@ -846,6 +880,9 @@ void solve(double **qubo, const int qubo_size, int8_t **solution_list, double *e
                         change = change + t_change;
                         numPartCalls++;
                         DwaveQubo++;
+                        if (endsearch) {
+                            break;
+                        }
                         // end critical region
                     }
                     free(Icompress);
@@ -949,9 +986,8 @@ void solve(double **qubo, const int qubo_size, int8_t **solution_list, double *e
                 ContinueWhile = false;
             }
         }
-
         // timeout test
-        if (CPSECONDS >= Time_) {
+        if (CPSECONDS >= Time_ || endsearch) {
             ContinueWhile = false;
         }
     }  // end of outer loop
