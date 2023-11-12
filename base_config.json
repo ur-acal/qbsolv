@@ -1,0 +1,12 @@
+{
+  "BRIM": "True",
+  "algorithm": "d",
+  "timeout": 500,
+  "repeats": 50,
+  "subproblemSize": 100, 
+  "anneal": 1.1e-6,
+  "sd0": 2.2,
+  "sd1": 0.6,
+  "tracePath": "spin_dump.txt",
+  "dumpPath": "spin_dump.txt"
+}
