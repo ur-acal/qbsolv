@@ -78,7 +78,7 @@ void print_opts(int maxNodes, parameters_t *param);
 
 //  This routine performs the standard output for qbsolv
 void print_output(int maxNodes, int8_t *solution, long numPartCalls, double energy, double seconds,
-                  parameters_t *param);
+                  parameters_t *param, int64_t accepted_flips);
 
 /* val[] --> Array to be sorted,
    arr[] --> index to point to order from largest to smallest

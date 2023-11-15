@@ -211,7 +211,7 @@ void print_opts(int maxNodes, parameters_t *param) {
 //  This routine performs the standard output for qbsolv
 //
 void print_output(int maxNodes, int8_t *solution, long numPartCalls, double energy, double seconds,
-                  parameters_t *param) {
+                  parameters_t *param, int64_t accepted_flips) {
     int i;
 
     if (numsolOut_ > 0) {
@@ -224,7 +224,8 @@ void print_output(int maxNodes, int8_t *solution, long numPartCalls, double ener
     fprintf(outFile_, "\n");
     fprintf(outFile_, "%8.5f Energy of solution\n", energy);
     fprintf(outFile_, "%ld Number of Partitioned calls, %d output sample \n", numPartCalls, numsolOut_);
-    fprintf(outFile_, "%8.5f seconds of classic cpu time", seconds);
+    fprintf(outFile_, "%8.5f seconds of classic cpu time\n", seconds);
+    fprintf(outFile_, "%ld accepted flips", accepted_flips);
     if (TargetSet_) {
         fprintf(outFile_, " ,Target of %8.5f\n", Target_);
     } else {
