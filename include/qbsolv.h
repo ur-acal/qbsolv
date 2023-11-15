@@ -27,7 +27,7 @@ extern "C" {
 // - the size of the sub problem
 // - a state vector: on input is the current best state, and should be set to the output state
 // - random seed
-typedef void (*SubSolver)(double**, int, int8_t*, void*);
+typedef void (*SubSolver)(double**, int, int8_t*, void*, int64_t*);
 
 // A parameter structure used to pass in optional arguments to the qbsolv: solve method.
 typedef struct parameters_t {
@@ -57,14 +57,14 @@ typedef  struct trace_params {
 parameters_t default_parameters(void);
 
 // Callback for `solve` to use one of the `dw` calling methods
-void dw_sub_sample(double** sub_qubo, int subMatrix, int8_t* sub_solution, void* sub_sampler_data);
+void dw_sub_sample(double** sub_qubo, int subMatrix, int8_t* sub_solution, void* sub_sampler_data, int64_t* accepted_flips);
 
 // Callback for `solve` to use BRIM on subproblems
-void brim_sub_sample(double **sub_qubo, int subMatrix, int8_t *sub_solution, void *sub_sampler_data);
+void brim_sub_sample(double **sub_qubo, int subMatrix, int8_t *sub_solution, void *sub_sampler_data, int64_t* accepted_flips);
 
 // Callback for `solve` to use tabu on subproblems
-void tabu_sub_sample(double** sub_qubo, int subMatrix, int8_t* sub_solution, void* sub_sampler_data);
-void trace_subsample(double **sub_qubo, int subMatrix, int8_t *sub_solution, void *sub_sampler_data);
+void tabu_sub_sample(double** sub_qubo, int subMatrix, int8_t* sub_solution, void* sub_sampler_data, int64_t* accepted_flips);
+void trace_subsample(double **sub_qubo, int subMatrix, int8_t *sub_solution, void *sub_sampler_data, int64_t* accepted_flips);
 // Entry into the overall solver from the main program
 void solve(double** qubo, const int qubo_size, int8_t** solution_list, double* energy_list, int* solution_counts,
            int* Qindex, int QLEN, parameters_t* param);

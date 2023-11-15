@@ -131,9 +131,9 @@ double evaluate(int8_t *const solution, const uint qubo_size, const double **con
 //     neither the pointer nor the data can be changed
 //
 double evaluate_1bit(const double old_energy, const uint bit, int8_t *const solution, const uint qubo_size,
-                     const double **const qubo, double *const flip_cost) {
+                     const double **const qubo, double *const flip_cost, int64_t* accepted_flips) {
     double result = old_energy + flip_cost[bit];
-
+    *accepted_flips = *accepted_flips + 1;
     // Flip the bit and reverse its flip_cost
     solution[bit] = 1 - solution[bit];
     flip_cost[bit] = -flip_cost[bit];
@@ -176,7 +176,7 @@ double evaluate_1bit(const double old_energy, const uint bit, int8_t *const solu
 // @param[in,out] bit_flips is the number of candidate bit flips performed in the entire algorithm so far
 // @returns New energy of the modified solution
 double local_search_1bit(double energy, int8_t *solution, uint qubo_size, double **qubo, double *flip_cost,
-                         int64_t *bit_flips) {
+                         int64_t *bit_flips, int64_t* accepted_flips) {
     int kkstr = 0, kkend = qubo_size, kkinc;
     int *index;
     if (GETMEM(index, int, qubo_size) == NULL) BADMALLOC
@@ -206,7 +206,7 @@ double local_search_1bit(double energy, int8_t *solution, uint qubo_size, double
             uint bit = index[kk];
             (*bit_flips)++;
             if (flip_cost[bit] > 0.0) {
-                energy = evaluate_1bit(energy, bit, solution, qubo_size, (const double **)qubo, flip_cost);
+                energy = evaluate_1bit(energy, bit, solution, qubo_size, (const double **)qubo, flip_cost, accepted_flips);
                 improve = true;
             }
         }
@@ -225,14 +225,14 @@ double local_search_1bit(double energy, int8_t *solution, uint qubo_size, double
 // @param[out] flip_cost The change in energy from flipping a bit
 // @param bit_flips is the number of candidate bit flips performed in the entire algorithm so far
 // @returns New energy of the modified solution
-double local_search(int8_t *solution, int qubo_size, double **qubo, double *flip_cost, int64_t *bit_flips) {
+double local_search(int8_t *solution, int qubo_size, double **qubo, double *flip_cost, int64_t *bit_flips, int64_t* accepted_flips) {
     double energy;
 
     // initial evaluate needed before evaluate_1bit can be used
     energy = evaluate(solution, qubo_size, (const double **)qubo, flip_cost);
     double temp = energy;
     energy = local_search_1bit(energy, solution, qubo_size, qubo, flip_cost,
-                               bit_flips);  // local search to polish the change
+                               bit_flips, accepted_flips);  // local search to polish the change
     // printf("%f %f\n", temp, energy);
     return energy;
 }
@@ -264,7 +264,7 @@ double local_search(int8_t *solution, int qubo_size, double **qubo, double *flip
 // @param target_set Do we have a target energy at which to terminate
 // @param index is the order in which to perform candidate bit flips (determined by flip_cost).
 double tabu_search(int8_t *solution, int8_t *best, uint qubo_size, double **qubo, double *flip_cost, int64_t *bit_flips,
-                   int64_t iter_max, int *TabuK, double target, bool target_set, int *index, int nTabu) {
+                   int64_t iter_max, int *TabuK, double target, bool target_set, int *index, int nTabu, int64_t* accepted_flips) {
     uint last_bit = 0;   // Track what the previously flipped bit was
     bool brk;            // flag to mark a break and not a fall-thru of the loop
     double best_energy;  // best solution so far
@@ -302,7 +302,7 @@ double tabu_search(int8_t *solution, int8_t *best, uint qubo_size, double **qubo
 
     sign = findMax_ ? 1.0 : -1.0;
 
-    best_energy = local_search(solution, qubo_size, qubo, flip_cost, bit_flips);
+    best_energy = local_search(solution, qubo_size, qubo, flip_cost, bit_flips, accepted_flips);
     val_index_sort(index, flip_cost, qubo_size);  // Create index array of sorted values
     thisIter = iter_max - (*bit_flips);
     increaseIter = thisIter / 2;
@@ -338,9 +338,9 @@ double tabu_search(int8_t *solution, int8_t *best, uint qubo_size, double **qubo
                     last_bit = bit;
                     float Delta_E = (float)(new_energy - best_energy);
                     new_energy = evaluate_1bit(Vlastchange, bit, solution, qubo_size, (const double **)qubo,
-                                               flip_cost);  // flip the bit and fix tables
+                                               flip_cost, accepted_flips);  // flip the bit and fix tables
                     Vlastchange = local_search_1bit(new_energy, solution, qubo_size, qubo, flip_cost,
-                                                    bit_flips);  // local search to polish the change
+                                                    bit_flips, accepted_flips);  // local search to polish the change
                     val_index_sort_ns(index, flip_cost,
                                       qubo_size);  // update index array of sorted values, don't shuffle index
                     best_energy = Vlastchange;
@@ -396,7 +396,7 @@ double tabu_search(int8_t *solution, int8_t *best, uint qubo_size, double **qubo
         if (bit_cycle > 6) break;
 
         if (!brk) {  // this is the fall-thru case and we haven't tripped interior If V> VS test so flip Q[K]
-            Vlastchange = evaluate_1bit(Vlastchange, last_bit, solution, qubo_size, (const double **)qubo, flip_cost);
+            Vlastchange = evaluate_1bit(Vlastchange, last_bit, solution, qubo_size, (const double **)qubo, flip_cost, accepted_flips);
         }
 
         uint i;
@@ -503,7 +503,7 @@ void reduce(int *Icompress, double **qubo, uint sub_qubo_size, uint qubo_size, d
 // @param TabuK stores the list of tabu moves
 // @param index is the order in which to perform candidate bit flips (determined by Qval).
 double solv_submatrix(int8_t *solution, int8_t *best, uint qubo_size, double **qubo, double *flip_cost,
-                      int64_t *bit_flips, int *TabuK, int *index) {
+                      int64_t *bit_flips, int *TabuK, int *index, int64_t* accepted_flips) {
     int nTabu;
     int64_t iter_max = (*bit_flips) + (int64_t)MAX((int64_t)3000, (int64_t)20000 * (int64_t)qubo_size);
     if (qubo_size < 20)
@@ -524,7 +524,7 @@ double solv_submatrix(int8_t *solution, int8_t *best, uint qubo_size, double **q
         nTabu = 35;
 
     return tabu_search(solution, best, qubo_size, qubo, flip_cost, bit_flips, iter_max, TabuK, Target_, false, index,
-                       nTabu);
+                       nTabu, accepted_flips);
 }
 // reduce_solv_projection reduces from a submatrix solves the QUBO projects the solution and
 //      returns the number of changes
@@ -535,7 +535,7 @@ double solv_submatrix(int8_t *solution, int8_t *best, uint qubo_size, double **q
 // @param[in,out] solution inputs a current solution and returns the projected solution
 // @param[out] stores the new, projected solution found during the algorithm
 int reduce_solve_projection(int *Icompress, double **qubo, int qubo_size, int subMatrix, int8_t *solution,
-                            parameters_t *param) {
+                            parameters_t *param, int64_t* accepted_flips) {
     int change = 0;
     int8_t *sub_solution = (int8_t *)malloc(sizeof(int8_t) * subMatrix);
     double **sub_qubo;
@@ -553,7 +553,7 @@ int reduce_solve_projection(int *Icompress, double **qubo, int qubo_size, int su
         sub_solution[i] = solution[Icompress[i]];
     }
 
-    param->sub_sampler(sub_qubo, subMatrix, sub_solution, param->sub_sampler_data);
+    param->sub_sampler(sub_qubo, subMatrix, sub_solution, param->sub_sampler_data, accepted_flips);
 
     // modification to write out subqubos
     // char subqubofile[sizeof "subqubo10000.qubo"];
@@ -577,14 +577,14 @@ int reduce_solve_projection(int *Icompress, double **qubo, int qubo_size, int su
     return change;
 }
 
-void dw_sub_sample(double** sub_qubo, int subMatrix, int8_t* sub_solution, void* sub_sampler_data) {
+void dw_sub_sample(double** sub_qubo, int subMatrix, int8_t* sub_solution, void* sub_sampler_data, int64_t *accepted_flips) {
     dw_solver(sub_qubo, subMatrix, sub_solution);
     int64_t sub_bit_flips = 0;  //  run a local search with higher precision than the Dwave
     double *flip_cost = (double *)malloc(sizeof(double) * subMatrix);
-    local_search(sub_solution, subMatrix, sub_qubo, flip_cost, &sub_bit_flips);
+    local_search(sub_solution, subMatrix, sub_qubo, flip_cost, &sub_bit_flips, accepted_flips);
     free(flip_cost);
 }
-void brim_sub_sample(double **sub_qubo, int subMatrix, int8_t *sub_solution, void *sub_sampler_data) {
+void brim_sub_sample(double **sub_qubo, int subMatrix, int8_t *sub_solution, void *sub_sampler_data, int64_t *accepted_flips) {
     double *flip_cost = (double *)malloc(sizeof(double) * subMatrix);
     double energy = evaluate(sub_solution, subMatrix, (const double **)sub_qubo, flip_cost);
     double temp = energy;
@@ -600,10 +600,10 @@ void brim_sub_sample(double **sub_qubo, int subMatrix, int8_t *sub_solution, voi
         fprintf(outfile, "%d", (int)sub_solution[i]);
     }
     fprintf(outfile, "\n");
-    local_search(sub_solution, subMatrix, sub_qubo, flip_cost, &sub_bit_flips);
+    local_search(sub_solution, subMatrix, sub_qubo, flip_cost, &sub_bit_flips, accepted_flips);
     free(flip_cost);
 }
-void trace_subsample(double **sub_qubo, int subMatrix, int8_t *sub_solution, void *sub_sampler_data) {
+void trace_subsample(double **sub_qubo, int subMatrix, int8_t *sub_solution, void *sub_sampler_data, int64_t *accepted_flips) {
     double *flip_cost = (double *)malloc(sizeof(double) * subMatrix);
     trace_params *trace_ptr = (trace_params *)sub_sampler_data;
     FILE *infile = trace_ptr->infile;
@@ -620,14 +620,14 @@ void trace_subsample(double **sub_qubo, int subMatrix, int8_t *sub_solution, voi
     for (size_t i = 0; i < subMatrix; i++) {
         sub_solution[i] = (int8_t)(bufptr[i] - '0');
     }
-    local_search(sub_solution, subMatrix, sub_qubo, flip_cost, &sub_bit_flips);
+    local_search(sub_solution, subMatrix, sub_qubo, flip_cost, &sub_bit_flips, accepted_flips);
     if (feof(infile) || fpeek(infile) == -1) {
         endsearch = 1;
         printf("subsolutions exhausted\n");
     }
     free(flip_cost);
 }
-void tabu_sub_sample(double** sub_qubo, int subMatrix, int8_t* sub_solution, void* sub_sampler_data) {
+void tabu_sub_sample(double** sub_qubo, int subMatrix, int8_t* sub_solution, void* sub_sampler_data, int64_t *accepted_flips) {
     int *TabuK;
     int *index;
     double *flip_cost = (double *)malloc(sizeof(double) * subMatrix);
@@ -642,7 +642,7 @@ void tabu_sub_sample(double** sub_qubo, int subMatrix, int8_t* sub_solution, voi
         index[i] = i;
         current_best[i] = sub_solution[i];
     }
-    solv_submatrix(sub_solution, current_best, subMatrix, sub_qubo, flip_cost, &bit_flips, TabuK, index);
+    solv_submatrix(sub_solution, current_best, subMatrix, sub_qubo, flip_cost, &bit_flips, TabuK, index, accepted_flips);
     free(current_best);
     free(flip_cost);
     free(index);
@@ -693,6 +693,7 @@ void solve(double **qubo, const int qubo_size, int8_t **solution_list, double *e
     int8_t *solution, *tabu_solution;
     long numPartCalls = 0;
     int64_t bit_flips = 0, IterMax;
+    int64_t accepted_flips = 0;
 
     start_ = clock();
     bit_flips = 0;
@@ -752,7 +753,7 @@ void solve(double **qubo, const int qubo_size, int8_t **solution_list, double *e
             printf(" Starting Full initial Tabu\n");
         }
         energy = tabu_search(solution, tabu_solution, qubo_size, qubo, flip_cost, &bit_flips, IterMax, TabuK, Target_,
-                             TargetSet_, index, 0);
+                             TargetSet_, index, 0, &accepted_flips);
 
         // save best result
         best_energy = energy;
@@ -769,7 +770,7 @@ void solve(double **qubo, const int qubo_size, int8_t **solution_list, double *e
         while (len_index < MIN(1 * subMatrix, qubo_size / 2)) {
             // DL;printf(" len_index %d %d \n",len_index,pass);
             randomize_solution(solution, qubo_size);
-            energy = local_search(solution, qubo_size, qubo, flip_cost, &bit_flips);
+            energy = local_search(solution, qubo_size, qubo, flip_cost, &bit_flips, &accepted_flips);
             result = manage_solutions(solution, solution_list, energy, energy_list, solution_counts, Qindex, QLEN,
                                       qubo_size, &num_nq_solutions);
             len_index = mul_index_solution_diff(solution_list, num_nq_solutions, qubo_size, Pcompress, 0, Qindex);
@@ -779,7 +780,7 @@ void solve(double **qubo, const int qubo_size, int8_t **solution_list, double *e
         solution_population(solution, solution_list, num_nq_solutions, qubo_size, Qindex, 10);
         IterMax = bit_flips + (int64_t)MAX((int64_t)40, InitialTabuPass_factor * (int64_t)qubo_size / 2);
         energy = tabu_search(solution, tabu_solution, qubo_size, qubo, flip_cost, &bit_flips, IterMax, TabuK, Target_,
-                             TargetSet_, index, 0);
+                             TargetSet_, index, 0, &accepted_flips);
         result = manage_solutions(solution, solution_list, energy, energy_list, solution_counts, Qindex, QLEN,
                                   qubo_size, &num_nq_solutions);
         Qbest = &solution_list[Qindex[0]][0];
@@ -792,7 +793,7 @@ void solve(double **qubo, const int qubo_size, int8_t **solution_list, double *e
 
     val_index_sort(index, flip_cost, qubo_size);  // create index array of sorted values
     if (Verbose_ > 0) {
-        print_output(qubo_size, solution, numPartCalls, best_energy * sign, CPSECONDS, param);
+        print_output(qubo_size, solution, numPartCalls, best_energy * sign, CPSECONDS, param, accepted_flips);
     }
     if (Verbose_ > 1) {
         DLT;
@@ -874,7 +875,7 @@ void solve(double **qubo, const int qubo_size, int8_t **solution_list, double *e
                                 Icompress[j++] = Pcompress[i];  // create compression index
                             }
                         }
-                        t_change = reduce_solve_projection(Icompress, qubo, qubo_size, subMatrix, solution, param);
+                        t_change = reduce_solve_projection(Icompress, qubo, qubo_size, subMatrix, solution, param, &accepted_flips);
                         // do the following in a critical region
 
                         change = change + t_change;
@@ -921,7 +922,7 @@ void solve(double **qubo, const int qubo_size, int8_t **solution_list, double *e
         IterMax = bit_flips + TabuPass_factor * (int64_t)qubo_size;
         val_index_sort(index, flip_cost, qubo_size);  // Create index array of sorted values
         energy = tabu_search(solution, tabu_solution, qubo_size, qubo, flip_cost, &bit_flips, IterMax, TabuK, Target_,
-                             TargetSet_, index, 0);
+                             TargetSet_, index, 0, &accepted_flips);
         val_index_sort(index, flip_cost, qubo_size);  // Create index array of sorted values
 
         if (Verbose_ > 1) {
@@ -943,7 +944,7 @@ void solve(double **qubo, const int qubo_size, int8_t **solution_list, double *e
                 printf(" IMPROVEMENT; RepeatPass set to %d\n", RepeatPass);
             }
             if (Verbose_ > 0) {
-                print_output(qubo_size, Qbest, numPartCalls, best_energy * sign, CPSECONDS, param);
+                print_output(qubo_size, Qbest, numPartCalls, best_energy * sign, CPSECONDS, param, accepted_flips);
             }
         } else if (result.code == DUPLICATE_ENERGY ||
                    result.code == DUPLICATE_HIGHEST_ENERGY) {  // equal solution, but it is different
@@ -956,7 +957,7 @@ void solve(double **qubo, const int qubo_size, int8_t **solution_list, double *e
             }
             if (result.code == DUPLICATE_HIGHEST_ENERGY && result.count == 1) {
                 if (Verbose_ > 0) {
-                    print_output(qubo_size, Qbest, numPartCalls, best_energy * sign, CPSECONDS, param);
+                    print_output(qubo_size, Qbest, numPartCalls, best_energy * sign, CPSECONDS, param, accepted_flips);
                 }
             }
         } else if (result.code == NOTHING) {  // not as good as our worst so far
@@ -1000,7 +1001,7 @@ void solve(double **qubo, const int qubo_size, int8_t **solution_list, double *e
         best_energy = energy_list[Qindex[0]];
         // printf(" evaluated solution %8.2lf\n",
         //     sign * Simple_evaluate(Qbest, qubo_size, (const double **)qubo));
-        print_output(qubo_size, Qbest, numPartCalls, best_energy * sign, CPSECONDS, param);
+        print_output(qubo_size, Qbest, numPartCalls, best_energy * sign, CPSECONDS, param, accepted_flips);
     }
 
     free(solution);
