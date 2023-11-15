@@ -60,29 +60,34 @@ Slurm Job Array creation script (Please pardon our dust, work in progress)
 #   differ from the base
 config_list = [
 
+#     {
+#       'subproblemSize': [200, 250],
+#       'timeout': [600],
+#       'BRIM': [True]
+#     },
+    
     {
-      'heuristic': ['BURER2002', 'PALUBECKIS2004bMST2'],
-      'runtime': [200]
+      'subproblemSize': [47, 250],
+      'timeout': [0.1, 0.5, 1, 5],
+      'BRIM': [False]
     }
 ]
 
-
+nvals = np.arange(300, 1001, 50)
+_iter = range(5)
 # Specify the graph class and graph names that you want to run,
 #   and how many iterations of each
 sweep_jobs = {
-    'graph_class': ['set'],
-    'graph': ['G022', 'G027', 'G032', 'G033', 'G034', 
-              'G035', 'G039', 'G055', 'G056', 'G057', 
-              'G058', 'G059', 'G060', 'G061', 'G062', 
-              'G063', 'G064', 'G065'],
-    'iter': range(50)
+    'graph_class': ['erdos_renyi'],
+    'graph': ["erdos_renyi_bimodal_n_{}_a_4_{}.qubo".format(n, i) for n, i in product(nvals, _iter)],
+    'iter': range(20)
 }
 
 # Define the simulation name and short justification
 # (folder will be sim{sim_no:03d}_{name})
 project = 'QBSolv'
-sim_no = 0
-name = "qbsolv_init_test"
+sim_no = 2
+name = "qbsolv_speedup"
 simname = f'sim{sim_no:03d}_{name}'
 justif = """
    Comparing against the DA results from Matsubara et. al and DSRA
@@ -164,6 +169,7 @@ def main():
     print('Making/building directory...')
     os.makedirs(result_dir)
     os.mkdir(result_dir+'/build')
+    os.mkdir(result_dir+'/traces')
     copy_and_compile(result_dir+'/build')
     parampath = result_dir+'/parameters'
     os.mkdir(parampath)
@@ -276,12 +282,12 @@ def make_job_file(execpath: str,
 #SBATCH --time={time}
     """
     filepath = f'{target_directory}/jobs/qbsolv_job_{job_no}.sh'
-        
+    tracepath = f'{target_directory}/traces/qbsolv_trace_{job_no}.sh'
     with open(filepath, mode='w') as jobfile:
+        jobfile.write(f'{header}\n')
         if config['BRIM']:
-            jobfile.write(f'{header}\n')
             jobfile.write(f'{execpath}\\\n')
-            jobfile.write(f'\t-d qbsolv_trace_{job_no}.txt\\\n')
+            jobfile.write(f'\t-d {tracepath}\\\n')
             for parameter, value in config.items():
                 if parameter not in cmdlineparams:
                     continue
@@ -297,7 +303,7 @@ def make_job_file(execpath: str,
             jobfile.write('echo "RUNNING TRACE:\n"\n')
             
             jobfile.write(f'{execpath}\\\n')
-            jobfile.write(f'\t-f qbsolv_trace_{job_no}.txt\\\n')
+            jobfile.write(f'\t-f {tracepath}\\\n')
             for parameter, value in config.items():
                 if parameter not in cmdlineparams or parameter == 'BRIM':
                     continue

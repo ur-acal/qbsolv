@@ -4,7 +4,7 @@ from sys import argv
 from subprocess import run, PIPE, check_output, Popen
 
 
-mainpath = '/scratch/mburns13/data/ISING_RESULTS/MQLib'
+mainpath = '/scratch/mburns13/data/ISING_RESULTS/QBSolv'
 partition = 'ising'
 limsub = 25
 max_myjobs = 300
@@ -30,7 +30,7 @@ def main(simpath: str):
         while (headroom > 0):
             for i in range(0, min(headroom, limsub)):
                 launched += 1
-                jfile = f"{jobdir}/mqlib_job_{launched}.sh"
+                jfile = f"{jobdir}/qbsolv_job_{launched}.sh"
                 run(['sbatch', os.path.join(jobdir, jfile)], stdout=PIPE)
                 headroom -= 1
                 time.sleep(pause_timer)

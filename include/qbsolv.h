@@ -12,7 +12,7 @@
 */
 #pragma once
 
-#include <bits/types/FILE.h>
+#include <bits/types.h>
 #include "stdheaders_shim.h"
 #include "stdio.h"
 #include "stdio.h"
