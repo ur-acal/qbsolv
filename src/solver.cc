@@ -694,6 +694,7 @@ void solve(double **qubo, const int qubo_size, int8_t **solution_list, double *e
     long numPartCalls = 0;
     int64_t bit_flips = 0, IterMax;
     int64_t accepted_flips = 0;
+    int64_t accepted_flips_subsolver = 0;
 
     start_ = clock();
     bit_flips = 0;
@@ -793,7 +794,7 @@ void solve(double **qubo, const int qubo_size, int8_t **solution_list, double *e
 
     val_index_sort(index, flip_cost, qubo_size);  // create index array of sorted values
     if (Verbose_ > 0) {
-        print_output(qubo_size, solution, numPartCalls, best_energy * sign, CPSECONDS, param, accepted_flips);
+        print_output(qubo_size, solution, numPartCalls, best_energy * sign, CPSECONDS, param, accepted_flips, accepted_flips_subsolver);
     }
     if (Verbose_ > 1) {
         DLT;
@@ -875,7 +876,7 @@ void solve(double **qubo, const int qubo_size, int8_t **solution_list, double *e
                                 Icompress[j++] = Pcompress[i];  // create compression index
                             }
                         }
-                        t_change = reduce_solve_projection(Icompress, qubo, qubo_size, subMatrix, solution, param, &accepted_flips);
+                        t_change = reduce_solve_projection(Icompress, qubo, qubo_size, subMatrix, solution, param, &accepted_flips_subsolver);
                         // do the following in a critical region
 
                         change = change + t_change;
@@ -944,7 +945,7 @@ void solve(double **qubo, const int qubo_size, int8_t **solution_list, double *e
                 printf(" IMPROVEMENT; RepeatPass set to %d\n", RepeatPass);
             }
             if (Verbose_ > 0) {
-                print_output(qubo_size, Qbest, numPartCalls, best_energy * sign, CPSECONDS, param, accepted_flips);
+                print_output(qubo_size, Qbest, numPartCalls, best_energy * sign, CPSECONDS, param, accepted_flips, accepted_flips_subsolver);
             }
         } else if (result.code == DUPLICATE_ENERGY ||
                    result.code == DUPLICATE_HIGHEST_ENERGY) {  // equal solution, but it is different
@@ -957,7 +958,7 @@ void solve(double **qubo, const int qubo_size, int8_t **solution_list, double *e
             }
             if (result.code == DUPLICATE_HIGHEST_ENERGY && result.count == 1) {
                 if (Verbose_ > 0) {
-                    print_output(qubo_size, Qbest, numPartCalls, best_energy * sign, CPSECONDS, param, accepted_flips);
+                    print_output(qubo_size, Qbest, numPartCalls, best_energy * sign, CPSECONDS, param, accepted_flips, accepted_flips_subsolver);
                 }
             }
         } else if (result.code == NOTHING) {  // not as good as our worst so far
@@ -1001,7 +1002,7 @@ void solve(double **qubo, const int qubo_size, int8_t **solution_list, double *e
         best_energy = energy_list[Qindex[0]];
         // printf(" evaluated solution %8.2lf\n",
         //     sign * Simple_evaluate(Qbest, qubo_size, (const double **)qubo));
-        print_output(qubo_size, Qbest, numPartCalls, best_energy * sign, CPSECONDS, param, accepted_flips);
+        print_output(qubo_size, Qbest, numPartCalls, best_energy * sign, CPSECONDS, param, accepted_flips, accepted_flips_subsolver);
     }
 
     free(solution);
