@@ -1,5 +1,5 @@
 #include "../src/util.c"
-#include "../src/extern.h"
+#include "../src/extern.hh"
 #include "../src/include.h"
 
 // compile with gcc util_index_solution_test.c

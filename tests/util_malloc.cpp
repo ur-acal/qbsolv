@@ -1,5 +1,5 @@
 #include "../src/util.h"
-#include "../src/extern.h"
+#include "../src/extern.hh"
 #include "gtest/gtest.h"
 
 // FILE            *outFile_;

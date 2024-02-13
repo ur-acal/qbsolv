@@ -60,15 +60,17 @@ Slurm Job Array creation script (Please pardon our dust, work in progress)
 #   differ from the base
 config_list = [
 
-#     {
-#       'subproblemSize': [200, 250],
-#       'timeout': [600],
-#       'BRIM': [True]
-#     },
+    {
+      'subproblemSize': [250],
+      'sd0': [0.8, 1.4, 1.8, 2.2],
+      'sd1': [0.8, 1.4, 1.8, 2.2],
+      'timeout': [5, 10, 50, 100, 200],
+      'BRIM': [True]
+    },
     
     {
-      'subproblemSize': [47, 250],
-      'timeout': [0.1, 0.5, 1, 5],
+      'subproblemSize': [250],
+      'timeout': [0.1, 0.5, 1, 5, 10],
       'BRIM': [False]
     }
 ]
@@ -78,16 +80,16 @@ _iter = range(5)
 # Specify the graph class and graph names that you want to run,
 #   and how many iterations of each
 sweep_jobs = {
-    'graph_class': ['erdos_renyi'],
-    'graph': ["erdos_renyi_bimodal_n_{}_a_4_{}.qubo".format(n, i) for n, i in product(nvals, _iter)],
+    'graph_class': ['set_qbsolv'],
+    'graph': ['G043.qubo'],
     'iter': range(20)
 }
 
 # Define the simulation name and short justification
 # (folder will be sim{sim_no:03d}_{name})
 project = 'QBSolv'
-sim_no = 2
-name = "qbsolv_speedup"
+sim_no = 0
+name = "small_sweep"
 simname = f'sim{sim_no:03d}_{name}'
 justif = """
    Comparing against the DA results from Matsubara et. al and DSRA

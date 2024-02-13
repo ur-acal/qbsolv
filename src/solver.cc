@@ -12,15 +12,17 @@
  limitations under the License.
 */
 
+#include <chrono>
 #include "dwsolv.h"
-#include "extern.h"
-#include "macros.h"
-#include "qbsolv.h"
+#include "extern.hh"
+#include "macros.hh"
+#include "qbsolv.hh"
 #include "assert.h"
 #include "util.h"
 #include "brim_solver.hh"
 
 #include <math.h>
+#include <chrono>
 #include <cstdio>
 
 #ifdef __cplusplus
@@ -535,7 +537,7 @@ double solv_submatrix(int8_t *solution, int8_t *best, uint qubo_size, double **q
 // @param[in,out] solution inputs a current solution and returns the projected solution
 // @param[out] stores the new, projected solution found during the algorithm
 int reduce_solve_projection(int *Icompress, double **qubo, int qubo_size, int subMatrix, int8_t *solution,
-                            parameters_t *param, int64_t* accepted_flips) {
+                            parameters_t *param, int64_t* accepted_flips, double* t_classic) {
     int change = 0;
     int8_t *sub_solution = (int8_t *)malloc(sizeof(int8_t) * subMatrix);
     double **sub_qubo;
@@ -553,7 +555,7 @@ int reduce_solve_projection(int *Icompress, double **qubo, int qubo_size, int su
         sub_solution[i] = solution[Icompress[i]];
     }
 
-    param->sub_sampler(sub_qubo, subMatrix, sub_solution, param->sub_sampler_data, accepted_flips);
+    param->sub_sampler(sub_qubo, subMatrix, sub_solution, param->sub_sampler_data, accepted_flips, t_classic);
 
     // modification to write out subqubos
     // char subqubofile[sizeof "subqubo10000.qubo"];
@@ -577,21 +579,27 @@ int reduce_solve_projection(int *Icompress, double **qubo, int qubo_size, int su
     return change;
 }
 
-void dw_sub_sample(double** sub_qubo, int subMatrix, int8_t* sub_solution, void* sub_sampler_data, int64_t *accepted_flips) {
+void dw_sub_sample(double** sub_qubo, int subMatrix, int8_t* sub_solution, void* sub_sampler_data, int64_t *accepted_flips, double* t_quantum) {
     dw_solver(sub_qubo, subMatrix, sub_solution);
     int64_t sub_bit_flips = 0;  //  run a local search with higher precision than the Dwave
     double *flip_cost = (double *)malloc(sizeof(double) * subMatrix);
+    auto tstart = std::chrono::high_resolution_clock::now();
     local_search(sub_solution, subMatrix, sub_qubo, flip_cost, &sub_bit_flips, accepted_flips);
+    auto tend = std::chrono::high_resolution_clock::now();
+    *t_quantum += std::chrono::duration_cast<std::chrono::microseconds>(tend-tstart).count();
     free(flip_cost);
 }
-void brim_sub_sample(double **sub_qubo, int subMatrix, int8_t *sub_solution, void *sub_sampler_data, int64_t *accepted_flips) {
+void brim_sub_sample(double **sub_qubo, int subMatrix, int8_t *sub_solution, void *sub_sampler_data, int64_t *accepted_flips, double* t_quantum) {
     double *flip_cost = (double *)malloc(sizeof(double) * subMatrix);
     double energy = evaluate(sub_solution, subMatrix, (const double **)sub_qubo, flip_cost);
     double temp = energy;
     brim_params* bp_ptr = (brim_params*)sub_sampler_data;
     brim_params bp = *bp_ptr;
+    auto tstart = std::chrono::high_resolution_clock::now();
 
     brim_solve(sub_qubo, subMatrix, sub_solution, bp.tstop, bp.seed++, bp.sd0, bp.sd1);
+    auto tend = std::chrono::high_resolution_clock::now();
+    *t_quantum += std::chrono::duration_cast<std::chrono::microseconds>(tend-tstart).count();
     *bp_ptr = bp;
     FILE* outfile = bp.outfile;
     energy = evaluate(sub_solution, subMatrix, (const double **)sub_qubo, flip_cost);
@@ -603,7 +611,7 @@ void brim_sub_sample(double **sub_qubo, int subMatrix, int8_t *sub_solution, voi
     local_search(sub_solution, subMatrix, sub_qubo, flip_cost, &sub_bit_flips, accepted_flips);
     free(flip_cost);
 }
-void trace_subsample(double **sub_qubo, int subMatrix, int8_t *sub_solution, void *sub_sampler_data, int64_t *accepted_flips) {
+void trace_subsample(double **sub_qubo, int subMatrix, int8_t *sub_solution, void *sub_sampler_data, int64_t *accepted_flips, double* t_quantum) {
     double *flip_cost = (double *)malloc(sizeof(double) * subMatrix);
     trace_params *trace_ptr = (trace_params *)sub_sampler_data;
     FILE *infile = trace_ptr->infile;
@@ -627,7 +635,7 @@ void trace_subsample(double **sub_qubo, int subMatrix, int8_t *sub_solution, voi
     }
     free(flip_cost);
 }
-void tabu_sub_sample(double** sub_qubo, int subMatrix, int8_t* sub_solution, void* sub_sampler_data, int64_t *accepted_flips) {
+void tabu_sub_sample(double** sub_qubo, int subMatrix, int8_t* sub_solution, void* sub_sampler_data, int64_t *accepted_flips, double* t_quantum) {
     int *TabuK;
     int *index;
     double *flip_cost = (double *)malloc(sizeof(double) * subMatrix);
@@ -642,7 +650,10 @@ void tabu_sub_sample(double** sub_qubo, int subMatrix, int8_t* sub_solution, voi
         index[i] = i;
         current_best[i] = sub_solution[i];
     }
+    auto tstart = std::chrono::high_resolution_clock::now();
     solv_submatrix(sub_solution, current_best, subMatrix, sub_qubo, flip_cost, &bit_flips, TabuK, index, accepted_flips);
+    auto tend = std::chrono::high_resolution_clock::now();
+    *t_quantum += std::chrono::duration_cast<std::chrono::microseconds>(tend-tstart).count()/1e6;
     free(current_best);
     free(flip_cost);
     free(index);
@@ -695,7 +706,7 @@ void solve(double **qubo, const int qubo_size, int8_t **solution_list, double *e
     int64_t bit_flips = 0, IterMax;
     int64_t accepted_flips = 0;
     int64_t accepted_flips_subsolver = 0;
-
+    auto start_clock = std::chrono::high_resolution_clock::now();
     start_ = clock();
     bit_flips = 0;
 
@@ -819,7 +830,7 @@ void solve(double **qubo, const int qubo_size, int8_t **solution_list, double *e
     }
 
     DwaveQubo = 0;
-
+    double remove_time = 0;
     // outer loop begin
     while (ContinueWhile) {
         if (qubo_size > 20 &&
@@ -876,7 +887,7 @@ void solve(double **qubo, const int qubo_size, int8_t **solution_list, double *e
                                 Icompress[j++] = Pcompress[i];  // create compression index
                             }
                         }
-                        t_change = reduce_solve_projection(Icompress, qubo, qubo_size, subMatrix, solution, param, &accepted_flips_subsolver);
+                        t_change = reduce_solve_projection(Icompress, qubo, qubo_size, subMatrix, solution, param, &accepted_flips_subsolver, &remove_time);
                         // do the following in a critical region
 
                         change = change + t_change;
@@ -997,12 +1008,14 @@ void solve(double **qubo, const int qubo_size, int8_t **solution_list, double *e
     // all done print results if needed and free allocated arrays
     if (WriteMatrix_) print_solution_and_qubo(Qbest, qubo_size, qubo);
 
+    auto stop_clock = std::chrono::high_resolution_clock::now();
+    double elapsed_time = std::chrono::duration_cast<std::chrono::microseconds>(stop_clock - start_clock).count() / 1e6;
     if (Verbose_ == 0) {
         Qbest = &solution_list[Qindex[0]][0];
         best_energy = energy_list[Qindex[0]];
         // printf(" evaluated solution %8.2lf\n",
         //     sign * Simple_evaluate(Qbest, qubo_size, (const double **)qubo));
-        print_output(qubo_size, Qbest, numPartCalls, best_energy * sign, CPSECONDS, param, accepted_flips, accepted_flips_subsolver);
+        print_output(qubo_size, Qbest, numPartCalls, best_energy * sign, (elapsed_time-remove_time), param, accepted_flips, accepted_flips_subsolver);
     }
 
     free(solution);

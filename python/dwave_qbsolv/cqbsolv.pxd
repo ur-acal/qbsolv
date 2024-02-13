@@ -10,7 +10,7 @@ cdef extern from "stdheaders_shim.h":
     ctypedef long long int64_t
     ctypedef int int32_t
 
-cdef extern from "qbsolv.h":
+cdef extern from "qbsolv.hh":
     # pointer type for subsolver.
     # Args:
     #   -a 2d double array that is the sub-problem
@@ -37,7 +37,7 @@ cdef extern from "util.h":
     void  **malloc2D(unsigned int rows, unsigned int cols, unsigned int size)
 
 
-cdef extern from "extern.h":
+cdef extern from "extern.hh":
     cdef FILE *outFile_
     cdef int maxNodes_
     cdef int nCouplers_

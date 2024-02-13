@@ -9,7 +9,7 @@ to do this without needing to make changes in multiple places.)
 Steps:
 1) Modify the qbsolv.odt file as needed.
 2) While still in OpenOffice, Export the contents as both PDF and HTML.
-3) Edit the qbsolv.html file, and in the section of "<META NAME=...>" lines 
+3) Edit the qbsolv.hhtml file, and in the section of "<META NAME=...>" lines 
 at the top, add the line
   <meta name="keywords" content="man qbsolv,qbsolv man page" />
 We believe this will make the instance of this file on github.com found by

@@ -14,7 +14,7 @@
  limitations under the License.
 */
 
-#include "extern.h"
+#include "extern.hh"
 #include "util.h"
 
 // this DEBUG function just checks for a corrupt Q bit vector

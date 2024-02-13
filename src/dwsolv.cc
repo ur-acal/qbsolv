@@ -21,8 +21,8 @@ static DW_epqmi *epqmi_;
 #include <locale.h>
 #include <stdio.h>
 #include "dwsolv.h"
-#include "extern.h"  // qubo header file: global variable declarations
-#include "macros.h"
+#include "extern.hh"  // qubo header file: global variable declarations
+#include "macros.hh"
 
 #include <math.h>
 #include <stdlib.h>
