@@ -23,7 +23,7 @@
 
 
 #include "dwsolv.h"
-#include "qbsolv.h"
+#include "qbsolv.hh"
 #include "readqubo.h"
 #include "util.h"
 

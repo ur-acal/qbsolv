@@ -3,7 +3,7 @@
 //  it is for visual inspection to see if rounding is working as expected
 
 #include "../src/util.c"
-#include "../src/extern.h"
+#include "../src/extern.hh"
 #include "../src/include.h"
 
 FILE *outFile_;

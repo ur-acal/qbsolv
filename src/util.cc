@@ -15,8 +15,8 @@
 */
 #include "util.h"
 #include <math.h>
-#include "extern.h"
-#include "qbsolv.h"
+#include "extern.hh"
+#include "qbsolv.hh"
 
 #ifdef __cplusplus
 extern "C" {

@@ -16,8 +16,8 @@
 
 #include <stdint.h>
 
-#include "extern.h"
-#include "macros.h"
+#include "extern.hh"
+#include "macros.hh"
 #include "readqubo.h"
 
 // read from inFile and parse the qubo file
