@@ -16,7 +16,7 @@
 #include "util.h"
 #include <math.h>
 #include "extern.h"
-#include "qbsolv.h"
+#include "qbsolv.hh"
 
 #ifdef __cplusplus
 extern "C" {
@@ -210,7 +210,7 @@ void print_opts(int maxNodes, parameters_t *param) {
 
 //  This routine performs the standard output for qbsolv
 //
-void print_output(int maxNodes, int8_t *solution, long numPartCalls, double energy, double seconds,
+void print_output(int maxNodes, int8_t *solution, long numPartCalls, double energy, double seconds, double subsolver_seconds,
                   parameters_t *param) {
     int i;
 
@@ -225,6 +225,7 @@ void print_output(int maxNodes, int8_t *solution, long numPartCalls, double ener
     fprintf(outFile_, "%8.5f Energy of solution\n", energy);
     fprintf(outFile_, "%ld Number of Partitioned calls, %d output sample \n", numPartCalls, numsolOut_);
     fprintf(outFile_, "%8.5f seconds of classic cpu time", seconds);
+    fprintf(outFile_, ", %8.5f seconds of subsolver cpu time", subsolver_seconds);
     if (TargetSet_) {
         fprintf(outFile_, " ,Target of %8.5f\n", Target_);
     } else {

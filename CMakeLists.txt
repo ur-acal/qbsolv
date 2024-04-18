@@ -19,14 +19,14 @@ if(MSVC)
     set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${CMAKE_SOURCE_DIR}/bin")
 endif(MSVC)
 
-if(CMAKE_C_COMPILER_ID MATCHES GNU OR CMAKE_C_COMPILER_ID MATCHES Clang)
-    set(CMAKE_C_FLAGS         "${CMAKE_C_FLAGS} -Wall -Wextra -std=gnu99")
-    set(CMAKE_C_FLAGS_DEBUG   "-O0 -g3")
-    set(CMAKE_C_FLAGS_RELEASE "-O3")
-endif()
+# if(CMAKE_C_COMPILER_ID MATCHES GNU OR CMAKE_C_COMPILER_ID MATCHES Clang)
+#     set(CMAKE_C_FLAGS         "${CMAKE_CXX_FLAGS} -Wall -Wextra -std=gnu99")
+#     set(CMAKE_C_FLAGS_DEBUG   "-O0 -g3")
+#     set(CMAKE_C_FLAGS_RELEASE "-O3")
+# endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES GNU OR CMAKE_CXX_COMPILER_ID MATCHES Clang)
-    set(CMAKE_CXX_FLAGS         "${CMAKE_CXX_FLAGS} -Wall -Wextra -std=gnu++11")
+    set(CMAKE_CXX_FLAGS         "${CMAKE_CXX_FLAGS} -Wall -Wextra -std=c++17")
     set(CMAKE_CXX_FLAGS_DEBUG   "-O0 -g3")
     set(CMAKE_CXX_FLAGS_RELEASE "-O3")
 endif()
@@ -40,7 +40,7 @@ set_target_properties(libqbsolv PROPERTIES PREFIX "")
 
 if(QBSOLV_BUILD_CMD)
     # compile main executable
-    add_executable(qbsolv cmd/main.c cmd/readqubo.c)
+    add_executable(qbsolv cmd/main.cc cmd/readqubo.cc)
 
     # link library
     target_link_libraries(qbsolv libqbsolv)

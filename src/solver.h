@@ -49,7 +49,7 @@ double solv_submatrix(int8_t *solution, int8_t *best, uint qubo_size, double **q
 
 // reduce_solv_projection reduces from a submatrix solves the QUBO projects the solution and
 //      returns the number of changes
-int reduce_solve_projection(int *Icompress, double **qubo, int qubo_size, int subMatrix, int8_t *solution,
+int reduce_solve_projection(int *Icompress, double **qubo, int qubo_size, int subMatrix, int8_t *solution, double& time,
                             parameters_t *param);
 
 #ifdef __cplusplus

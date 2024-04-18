@@ -1,7 +1,7 @@
 #include "solver.h"
 #include "extern.h"
 #include "gtest/gtest.h"
-#include "qbsolv.h"
+#include "qbsolv.hh"
 #include "util.h"
 
 // FILE            *outFile_;

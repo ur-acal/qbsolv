@@ -15,8 +15,9 @@
 #include "dwsolv.h"
 #include "extern.h"
 #include "macros.h"
-#include "qbsolv.h"
+#include "qbsolv.hh"
 #include "util.h"
+#include <chrono>
 
 #include <math.h>
 
@@ -520,7 +521,7 @@ double solv_submatrix(int8_t *solution, int8_t *best, uint qubo_size, double **q
 // @param[in,out] solution inputs a current solution and returns the projected solution
 // @param[out] stores the new, projected solution found during the algorithm
 int reduce_solve_projection(int *Icompress, double **qubo, int qubo_size, int subMatrix, int8_t *solution,
-                            parameters_t *param) {
+                            double& time, parameters_t *param) {
     int change = 0;
     int8_t *sub_solution = (int8_t *)malloc(sizeof(int8_t) * subMatrix);
     double **sub_qubo;
@@ -538,7 +539,7 @@ int reduce_solve_projection(int *Icompress, double **qubo, int qubo_size, int su
         sub_solution[i] = solution[Icompress[i]];
     }
 
-    param->sub_sampler(sub_qubo, subMatrix, sub_solution, param->sub_sampler_data);
+    param->sub_sampler(sub_qubo, subMatrix, sub_solution, time, param->sub_sampler_data);
 
     // modification to write out subqubos
     // char subqubofile[sizeof "subqubo10000.qubo"];
@@ -562,15 +563,20 @@ int reduce_solve_projection(int *Icompress, double **qubo, int qubo_size, int su
     return change;
 }
 
-void dw_sub_sample(double **sub_qubo, int subMatrix, int8_t *sub_solution, void *sub_sampler_data) {
+void dw_sub_sample(double **sub_qubo, int subMatrix, int8_t *sub_solution, double &time, void *sub_sampler_data) {
+    auto start = std::chrono::high_resolution_clock::now();
     dw_solver(sub_qubo, subMatrix, sub_solution);
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start) / 1e9;
+    time += duration.count();
     int64_t sub_bit_flips = 0;  //  run a local search with higher precision than the Dwave
     double *flip_cost = (double *)malloc(sizeof(double) * subMatrix);
     local_search(sub_solution, subMatrix, sub_qubo, flip_cost, &sub_bit_flips);
     free(flip_cost);
 }
 
-void tabu_sub_sample(double **sub_qubo, int subMatrix, int8_t *sub_solution, void *sub_sampler_data) {
+void tabu_sub_sample(double **sub_qubo, int subMatrix, int8_t *sub_solution, double& time, void *sub_sampler_data) {
+    auto start = std::chrono::high_resolution_clock::now();
     int *TabuK;
     int *index;
     double *flip_cost = (double *)malloc(sizeof(double) * subMatrix);
@@ -586,6 +592,9 @@ void tabu_sub_sample(double **sub_qubo, int subMatrix, int8_t *sub_solution, voi
         current_best[i] = sub_solution[i];
     }
     solv_submatrix(sub_solution, current_best, subMatrix, sub_qubo, flip_cost, &bit_flips, TabuK, index);
+    auto stop = std::chrono::high_resolution_clock::now();
+    auto duration = std::chrono::duration_cast<std::chrono::nanoseconds>(stop - start) / 1e9;
+    time += duration.count();
 
     free(current_best);
     free(flip_cost);
@@ -631,7 +640,7 @@ parameters_t default_parameters() {
 // @param QLEN Number of entries in the solution table
 // @param[in,out] param Other parameters to the solve method that have default values.
 void solve(double **qubo, const int qubo_size, int8_t **solution_list, double *energy_list, int *solution_counts,
-           int *Qindex, int QLEN, parameters_t *param) {
+           int *Qindex, int QLEN,  parameters_t *param) {
     double *flip_cost, energy;
     int *TabuK, *index, start_;
     int8_t *solution, *tabu_solution;
@@ -663,7 +672,7 @@ void solve(double **qubo, const int qubo_size, int8_t **solution_list, double *e
     int8_t *Qbest;
     double best_energy;
     int *Pcompress;
-
+    double subsolvertime = 0.0;
     if (GETMEM(Pcompress, int, qubo_size) == NULL) BADMALLOC
     // initialize and set some tuning parameters
     //
@@ -736,7 +745,7 @@ void solve(double **qubo, const int qubo_size, int8_t **solution_list, double *e
 
     val_index_sort(index, flip_cost, qubo_size);  // create index array of sorted values
     if (Verbose_ > 0) {
-        print_output(qubo_size, solution, numPartCalls, best_energy * sign, CPSECONDS, param);
+        print_output(qubo_size, solution, numPartCalls, best_energy * sign, CPSECONDS,subsolvertime, param);
     }
     if (Verbose_ > 1) {
         DLT;
@@ -818,7 +827,7 @@ void solve(double **qubo, const int qubo_size, int8_t **solution_list, double *e
                                 Icompress[j++] = Pcompress[i];  // create compression index
                             }
                         }
-                        t_change = reduce_solve_projection(Icompress, qubo, qubo_size, subMatrix, solution, param);
+                        t_change = reduce_solve_projection(Icompress, qubo, qubo_size, subMatrix, solution, subsolvertime, param);
                         // do the following in a critical region
 
                         change = change + t_change;
@@ -884,7 +893,7 @@ void solve(double **qubo, const int qubo_size, int8_t **solution_list, double *e
                 printf(" IMPROVEMENT; RepeatPass set to %d\n", RepeatPass);
             }
             if (Verbose_ > 0) {
-                print_output(qubo_size, Qbest, numPartCalls, best_energy * sign, CPSECONDS, param);
+                print_output(qubo_size, Qbest, numPartCalls, best_energy * sign, CPSECONDS,subsolvertime, param);
             }
         } else if (result.code == DUPLICATE_ENERGY ||
                    result.code == DUPLICATE_HIGHEST_ENERGY) {  // equal solution, but it is different
@@ -897,7 +906,7 @@ void solve(double **qubo, const int qubo_size, int8_t **solution_list, double *e
             }
             if (result.code == DUPLICATE_HIGHEST_ENERGY && result.count == 1) {
                 if (Verbose_ > 0) {
-                    print_output(qubo_size, Qbest, numPartCalls, best_energy * sign, CPSECONDS, param);
+                    print_output(qubo_size, Qbest, numPartCalls, best_energy * sign, CPSECONDS,subsolvertime, param);
                 }
             }
         } else if (result.code == NOTHING) {  // not as good as our worst so far
@@ -942,7 +951,7 @@ void solve(double **qubo, const int qubo_size, int8_t **solution_list, double *e
         best_energy = energy_list[Qindex[0]];
         // printf(" evaluated solution %8.2lf\n",
         //     sign * Simple_evaluate(Qbest, qubo_size, (const double **)qubo));
-        print_output(qubo_size, Qbest, numPartCalls, best_energy * sign, CPSECONDS, param);
+        print_output(qubo_size, Qbest, numPartCalls, best_energy * sign, CPSECONDS, subsolvertime, param);
     }
 
     free(solution);

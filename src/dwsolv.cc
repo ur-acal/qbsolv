@@ -28,6 +28,7 @@ static DW_epqmi *epqmi_;
 #include <stdlib.h>
 #include <sys/types.h>
 #include <time.h>
+#include <chrono>
 #ifdef _WIN32
 #include <process.h>
 #define getpid _getpid
@@ -49,7 +50,7 @@ int start_;
 int my_pid_;
 char DWcommand[256];
 FILE *f, *fr, *fs;
-int i, j, k, l;  // working integer set
+// int i, j, k, l;  // working integer set
 //
 // common declare complete, start function
 

@@ -77,7 +77,7 @@ void print_solution_and_qubo(int8_t *solution, int maxNodes, double **qubo);
 void print_opts(int maxNodes, parameters_t *param);
 
 //  This routine performs the standard output for qbsolv
-void print_output(int maxNodes, int8_t *solution, long numPartCalls, double energy, double seconds,
+void print_output(int maxNodes, int8_t *solution, long numPartCalls, double energy, double seconds, double subsolver_seconds,
                   parameters_t *param);
 
 /* val[] --> Array to be sorted,
