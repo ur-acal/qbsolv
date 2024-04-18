@@ -65,7 +65,6 @@ int main(int argc, char *argv[]) {
     parameters_t param = default_parameters();
 
     bool use_dwave = false;
-    bool use_brim = false;
     bool use_trace = false;
 
     extern char *optarg;
@@ -113,7 +112,6 @@ int main(int argc, char *argv[]) {
                                        {"Algo", required_argument, NULL, 'a'},
                                        {"TraceFile", required_argument, NULL, 'f'},
                                        {"DumpFile", required_argument, NULL, 'd'},
-                                       {"UseBRIM", no_argument, NULL, 'b'},
                                        {"Anneal", required_argument, NULL, 'y'},
                                        {"sd0", required_argument, NULL, 'p'},
                                        {"sd1", required_argument, NULL, 'z'},
@@ -232,10 +230,6 @@ int main(int argc, char *argv[]) {
                 break;
             case 'd':
                 dumpFileName = optarg;
-                
-                break;
-            case 'b':
-                use_brim = true;
                 break;
             case 'p':
                 sd0 = strtod(optarg, (char **)NULL);
@@ -255,22 +249,7 @@ int main(int argc, char *argv[]) {
     // options from command line complete
     //
     srand(seed);
-    if (use_brim) {
-        if ((dumpFile = fopen(dumpFileName, "w")) == NULL) {
-            fprintf(stderr,
-                    "\n\t Error - can't find/open file "
-                    "\"%s\"\n\n",
-                    optarg);
-            exit(9);
-        }
-        brim_params* bp = (brim_params*)malloc(sizeof(brim_params));
-        bp->outfile = dumpFile;
-        bp->seed = seed;
-        bp->sd0 = sd0;
-        bp->sd1 = sd1;
-        bp->tstop = tstop;
-        param.sub_sampler_data = bp;
-    }
+
     if (use_trace) {
         trace_params* tp = (trace_params*)malloc(sizeof(trace_params));
         tp->infile = traceFile;
@@ -301,10 +280,6 @@ int main(int argc, char *argv[]) {
     if (use_dwave) {  // either -S not set and DW_INTERNAL__CONNECTION env variable not NULL, or -S set to 0,
         param.sub_size = dw_init();
         param.sub_sampler = &dw_sub_sample;
-    }
-    if (use_brim) {  // either -S not set and DW_INTERNAL__CONNECTION env variable not NULL, or -S set to 0,
-        param.sub_size = param.sub_size;
-        param.sub_sampler = &brim_sub_sample;
     }
     if (use_trace) {
         param.sub_size = param.sub_size;
@@ -344,10 +319,6 @@ int main(int argc, char *argv[]) {
     if (Verbose_ > 3) {
         fprintf(outFile_, "\n\t\"qbsolv  -i %s\" (%d nodes, %d couplers) - end-of-job\n\n", inFileName, nNodes_,
                 nCouplers_);
-    }
-    if (use_brim) {
-        fclose(dumpFile);
-        free(param.sub_sampler_data);
     }
     if (use_trace) {
         fclose(traceFile);
@@ -434,19 +405,8 @@ void print_help(void) {
            "\t\tformat of the QUBO file.\n"
            "\t-r seed \n"
            "\t\tUsed to reset the seed for the random number generation \n"
-           "\t-y anneal \n"
-           "\t\tUsed to set BRIM simulation time. Default value: %f\n"
-           "\t-p sd0 \n"
-           "\t\tUsed to set starting BRIM noise standard deviation. Default value: %f\n"
-           "\t-z sd1 \n"
-           "\t\tUsed to set ending BRIM noise standard deviation. Default value: %f\n"
-           "\t-f tracePath\n"
-           "\t\tThe path to the tracefile from a previous BRIM run. Enables the trace subsampler\n"
-           "\t-d dumpPath\n"
-           "\t\tThe path to dump spin values from the BRIM subsampler. Default value: \"spin_dump.txt\"\n"
-           "\t-b\n"
-           "\t\tSelects the BRIM subsampler, dumps spin values to the provided (or default) dump file path\n",
-           pgmName_, Time_, defaultRepeats, defaultTstop, defaultSD0, defaultSD1);
+           "\t-y anneal \n",
+           pgmName_, Time_, defaultRepeats);
 
     return;
 }

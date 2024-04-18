@@ -47,7 +47,7 @@ add_executable(qbsolv cmd/main.c cmd/readqubo.c)
     # Add BRIM library
 
     # link library
-    target_link_libraries(qbsolv libqbsolv libbrim)
+    target_link_libraries(qbsolv libqbsolv)
 endif()
 
 if(QBSOLV_BUILD_TESTS)

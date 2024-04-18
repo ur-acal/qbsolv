@@ -43,13 +43,7 @@ typedef struct parameters_t {
     void* sub_sampler_data;
 } parameters_t;
 
-typedef  struct brim_params {
-    FILE* outfile;
-    uint64_t seed;
-    double sd0;
-    double sd1;
-    double tstop;
-} brim_params;
+
 typedef  struct trace_params {
     FILE* infile;
 } trace_params;
@@ -58,9 +52,6 @@ parameters_t default_parameters(void);
 
 // Callback for `solve` to use one of the `dw` calling methods
 void dw_sub_sample(double** sub_qubo, int subMatrix, int8_t* sub_solution, void* sub_sampler_data, int64_t* accepted_flips, double* remove_time);
-
-// Callback for `solve` to use BRIM on subproblems
-void brim_sub_sample(double **sub_qubo, int subMatrix, int8_t *sub_solution, void *sub_sampler_data, int64_t* accepted_flips, double* remove_time);
 
 // Callback for `solve` to use tabu on subproblems
 void tabu_sub_sample(double** sub_qubo, int subMatrix, int8_t* sub_solution, void* sub_sampler_data, int64_t* accepted_flips, double* remove_time);

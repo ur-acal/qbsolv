@@ -19,7 +19,6 @@
 #include "qbsolv.hh"
 #include "assert.h"
 #include "util.h"
-#include "brim_solver.hh"
 
 #include <math.h>
 #include <chrono>
@@ -537,7 +536,7 @@ double solv_submatrix(int8_t *solution, int8_t *best, uint qubo_size, double **q
 // @param[in,out] solution inputs a current solution and returns the projected solution
 // @param[out] stores the new, projected solution found during the algorithm
 int reduce_solve_projection(int *Icompress, double **qubo, int qubo_size, int subMatrix, int8_t *solution,
-                            parameters_t *param, int64_t* accepted_flips, double* t_classic) {
+                            parameters_t *param, int64_t* accepted_flips, double* t_quantum) {
     int change = 0;
     int8_t *sub_solution = (int8_t *)malloc(sizeof(int8_t) * subMatrix);
     double **sub_qubo;
@@ -555,7 +554,7 @@ int reduce_solve_projection(int *Icompress, double **qubo, int qubo_size, int su
         sub_solution[i] = solution[Icompress[i]];
     }
 
-    param->sub_sampler(sub_qubo, subMatrix, sub_solution, param->sub_sampler_data, accepted_flips, t_classic);
+    param->sub_sampler(sub_qubo, subMatrix, sub_solution, param->sub_sampler_data, accepted_flips, t_quantum);
 
     // modification to write out subqubos
     // char subqubofile[sizeof "subqubo10000.qubo"];
@@ -587,28 +586,6 @@ void dw_sub_sample(double** sub_qubo, int subMatrix, int8_t* sub_solution, void*
     local_search(sub_solution, subMatrix, sub_qubo, flip_cost, &sub_bit_flips, accepted_flips);
     auto tend = std::chrono::high_resolution_clock::now();
     *t_quantum += std::chrono::duration_cast<std::chrono::microseconds>(tend-tstart).count();
-    free(flip_cost);
-}
-void brim_sub_sample(double **sub_qubo, int subMatrix, int8_t *sub_solution, void *sub_sampler_data, int64_t *accepted_flips, double* t_quantum) {
-    double *flip_cost = (double *)malloc(sizeof(double) * subMatrix);
-    double energy = evaluate(sub_solution, subMatrix, (const double **)sub_qubo, flip_cost);
-    double temp = energy;
-    brim_params* bp_ptr = (brim_params*)sub_sampler_data;
-    brim_params bp = *bp_ptr;
-    auto tstart = std::chrono::high_resolution_clock::now();
-
-    brim_solve(sub_qubo, subMatrix, sub_solution, bp.tstop, bp.seed++, bp.sd0, bp.sd1);
-    auto tend = std::chrono::high_resolution_clock::now();
-    *t_quantum += std::chrono::duration_cast<std::chrono::microseconds>(tend-tstart).count();
-    *bp_ptr = bp;
-    FILE* outfile = bp.outfile;
-    energy = evaluate(sub_solution, subMatrix, (const double **)sub_qubo, flip_cost);
-    int64_t sub_bit_flips = 0;  //  run a local search with higher precision than the Dwave
-    for (size_t i = 0; i < subMatrix; i++) {
-        fprintf(outfile, "%d", (int)sub_solution[i]);
-    }
-    fprintf(outfile, "\n");
-    local_search(sub_solution, subMatrix, sub_qubo, flip_cost, &sub_bit_flips, accepted_flips);
     free(flip_cost);
 }
 void trace_subsample(double **sub_qubo, int subMatrix, int8_t *sub_solution, void *sub_sampler_data, int64_t *accepted_flips, double* t_quantum) {
