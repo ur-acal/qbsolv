@@ -7,7 +7,7 @@ from subprocess import run, PIPE, check_output, Popen
 mainpath = '/scratch/mburns13/data/ISING_RESULTS/QBSolv'
 partition = 'ising'
 limsub = 25
-max_myjobs = 300
+max_myjobs = 900
 check_timer = 3
 pause_timer_batch = 0.5
 pause_timer = 0.2
